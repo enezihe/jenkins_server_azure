@@ -9,8 +9,7 @@ terraform {
 
 provider "azurerm" {
   features {
-    
-  }
+    }
 }
 
 resource "azurerm_resource_group" "rg" {
@@ -52,6 +51,10 @@ resource "azurerm_virtual_machine" "vm" {
   network_interface_ids = [azurerm_network_interface.nic.id]
   vm_size               = "Standard_D2s_v3"
 
+  identity {
+    type = "SystemAssigned"
+  }
+
   # Uncomment this line to delete the OS disk automatically when deleting the VM
   # delete_os_disk_on_termination = true
 
@@ -74,8 +77,10 @@ resource "azurerm_virtual_machine" "vm" {
     computer_name  = "hostname"
     admin_username = "testadmin"
     admin_password = "Password1234!"
-    /* custom_data =  */
+    custom_data    =  file("userdata.sh")
   }
+
+
   os_profile_linux_config {
     disable_password_authentication = true
     ssh_keys {
@@ -85,6 +90,12 @@ resource "azurerm_virtual_machine" "vm" {
   }
   }
 
+
+
+/* data "template_file" "userdata" {
+  template = file("${abspath(path.module)}/userdata.sh")
+} */
+#template file'in nerede oldugunu soyle. buu data ya cevir.
 data "azurerm_ssh_public_key" "sshkey" {
   name                = "azure-ssh"
   resource_group_name = "nbt-rg-test"
@@ -130,4 +141,15 @@ resource "azurerm_network_security_group" "nsg" {
   resource "azurerm_network_interface_security_group_association" "example" {
   network_interface_id      = azurerm_network_interface.nic.id
   network_security_group_id = azurerm_network_security_group.nsg.id
+}
+
+data "azurerm_subscription" "current" {}
+
+data "azurerm_role_definition" "contributor" {  #boyle bir rol/bilgi var diyor
+  name = "Contributor"
+}
+resource "azurerm_role_assignment" "example" {
+  scope              = data.azurerm_subscription.current.id
+  role_definition_id = "${data.azurerm_subscription.current.id}${data.azurerm_role_definition.contributor.id}"
+  principal_id       = azurerm_virtual_machine.vm.identity[0].principal_id
 }
